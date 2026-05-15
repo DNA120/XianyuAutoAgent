@@ -706,46 +706,30 @@ class XianyuLive:
 
 
 
-def check_and_complete_env():
+def check_and_complete_env(require_config=True):
     """检查并补全关键环境变量"""
-    # 定义关键变量及其默认无效值（占位符）
-    critical_vars = {
-        "API_KEY": "默认使用通义千问,apikey通过百炼模型平台获取",
-        "COOKIES_STR": "your_cookies_here"
-    }
+    # 定义关键变量
+    critical_vars = ["API_KEY", "COOKIES_STR"]
     
-    env_path = ".env"
-    updated = False
-    
-    for key, placeholder in critical_vars.items():
+    # 检查配置是否完整
+    config_complete = True
+    for key in critical_vars:
         curr_val = os.getenv(key)
-        
-        # 如果变量未设置，或者值等于占位符
-        if not curr_val or curr_val == placeholder:
-            logger.warning(f"配置项 [{key}] 未设置或为默认值，请输入")
-            while True:
-                val = input(f"请输入 {key}: ").strip()
-                if val:
-                    # 更新当前环境
-                    os.environ[key] = val
-                    
-                    # 尝试持久化到 .env
-                    try:
-                        # 如果没有.env文件，先创建
-                        if not os.path.exists(env_path):
-                            with open(env_path, 'w', encoding='utf-8') as f:
-                                pass # Create empty file
-                        
-                        set_key(env_path, key, val)
-                        updated = True
-                    except Exception as e:
-                        logger.warning(f"无法自动写入.env文件，请手动保存: {e}")
-                    break
-                else:
-                    print(f"{key} 不能为空，请重新输入")
+        if not curr_val or curr_val.strip() == "":
+            config_complete = False
+            logger.warning(f"配置项 [{key}] 未设置")
     
-    if updated:
-        logger.info("新的配置已保存/更新至 .env 文件中")
+    if config_complete:
+        logger.info("配置检查通过")
+        return True
+    else:
+        if require_config:
+            logger.error("配置不完整，请在前端管理界面中配置 API_KEY 和 COOKIES_STR")
+            logger.error("启动失败：缺少必要的配置")
+            return False
+        else:
+            logger.warning("配置不完整，但允许启动（仅前端管理界面可用）")
+            return False
 
 
 if __name__ == '__main__':
@@ -768,8 +752,9 @@ if __name__ == '__main__':
     )
     logger.info(f"日志级别设置为: {log_level}")
     
-    # 交互式检查并补全配置
-    check_and_complete_env()
+    # 检查配置是否完整
+    if not check_and_complete_env(require_config=True):
+        exit(1)
     
     cookies_str = os.getenv("COOKIES_STR")
     bot = XianyuReplyBot()

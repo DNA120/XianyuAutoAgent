@@ -13,7 +13,33 @@ current_logs = []
 bot_process = None
 log_lock = threading.Lock()
 
+# 默认配置模板
+DEFAULT_CONFIG = {
+    'API_KEY': '',
+    'COOKIES_STR': '',
+    'MODEL_BASE_URL': 'https://api.deepseek.com/v1',
+    'MODEL_NAME': 'deepseek-chat',
+    'TOGGLE_KEYWORDS': '。',
+    'SIMULATE_HUMAN_TYPING': 'False',
+    'LOG_LEVEL': 'INFO'
+}
+
+def init_default_env():
+    """初始化默认配置文件（如果不存在）"""
+    env_path = '.env'
+    if not os.path.exists(env_path):
+        with open(env_path, 'w', encoding='utf-8') as f:
+            f.write("# XianyuAutoAgent 配置文件\n")
+            f.write("# 请在前端管理界面中配置以下参数\n\n")
+            for key, value in DEFAULT_CONFIG.items():
+                f.write(f"{key}={value}\n")
+        print("已创建默认配置文件 .env")
+
 def read_env_file():
+    """读取配置文件"""
+    # 确保配置文件存在
+    init_default_env()
+    
     env_path = '.env'
     config = {}
     if os.path.exists(env_path):
@@ -23,13 +49,28 @@ def read_env_file():
                 if line and not line.startswith('#') and '=' in line:
                     key, value = line.split('=', 1)
                     config[key.strip()] = value.strip()
+    # 补充缺失的默认配置
+    for key, value in DEFAULT_CONFIG.items():
+        if key not in config:
+            config[key] = value
     return config
 
 def write_env_file(config):
+    """写入配置文件"""
     env_path = '.env'
     with open(env_path, 'w', encoding='utf-8') as f:
+        f.write("# XianyuAutoAgent 配置文件\n")
+        f.write("# 请在前端管理界面中配置以下参数\n\n")
         for key, value in config.items():
             f.write(f"{key}={value}\n")
+
+def check_config_complete(config):
+    """检查配置是否完整"""
+    required_keys = ['API_KEY', 'COOKIES_STR']
+    for key in required_keys:
+        if not config.get(key) or config[key].strip() == '':
+            return False
+    return True
 
 def monitor_logs():
     global current_logs
@@ -70,6 +111,25 @@ def api_config():
         write_env_file(config)
         return jsonify({"success": True, "message": "配置已保存"})
 
+@app.route('/api/config/status')
+def api_config_status():
+    """检查配置是否完整"""
+    config = read_env_file()
+    is_complete = check_config_complete(config)
+    
+    missing_items = []
+    if not config.get('API_KEY') or config['API_KEY'].strip() == '':
+        missing_items.append('API_KEY')
+    if not config.get('COOKIES_STR') or config['COOKIES_STR'].strip() == '':
+        missing_items.append('COOKIES_STR')
+    
+    return jsonify({
+        "complete": is_complete,
+        "missing": missing_items,
+        "has_api_key": bool(config.get('API_KEY') and config['API_KEY'].strip() != ''),
+        "has_cookies": bool(config.get('COOKIES_STR') and config['COOKIES_STR'].strip() != '')
+    })
+
 @app.route('/api/status')
 def api_status():
     return jsonify({
@@ -94,6 +154,11 @@ def api_start():
     
     if is_running:
         return jsonify({"error": "机器人已在运行中"}), 400
+    
+    # 检查配置是否完整
+    config = read_env_file()
+    if not check_config_complete(config):
+        return jsonify({"error": "配置不完整，请先在配置页面设置 API_KEY 和 COOKIES_STR"}), 400
     
     try:
         os.makedirs('logs', exist_ok=True)
@@ -131,7 +196,7 @@ def api_start():
         
         if bot_process.poll() is not None:
             is_running = False
-            return jsonify({"error": "启动失败，请检查配置"}), 500
+            return jsonify({"error": "启动失败，请检查配置是否正确"}), 500
         
         return jsonify({"success": True, "message": "机器人启动成功"})
     

@@ -528,11 +528,11 @@
                     <div class="stat-label">运行时长</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-icon red">
-                        <svg viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+                    <div class="stat-icon" id="configStatusIcon">
+                        <svg viewBox="0 0 24 24"><path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM10 17l-3.5-3.5 1.41-1.41L10 14.17l4.59-4.59L16 11l-6 6z"/></svg>
                     </div>
-                    <div class="stat-value" id="errorCount">0</div>
-                    <div class="stat-label">错误次数</div>
+                    <div class="stat-value" id="configStatus">检查中</div>
+                    <div class="stat-label">配置状态</div>
                 </div>
             </div>
             
@@ -768,6 +768,8 @@
                 });
                 const data = await response.json();
                 showToast(data.message || '保存成功');
+                // 更新配置状态显示
+                checkConfigStatus();
             } catch (error) {
                 showToast('保存失败', 'error');
             }
@@ -779,10 +781,50 @@
                 const response = await fetch('/api/status');
                 const data = await response.json();
                 
+                const wasRunning = isRunning;
                 isRunning = data.is_running;
                 updateStatusUI();
+                
+                // 如果机器人正在运行但之前没有记录startTime，设置当前时间为起始时间
+                if (isRunning && !wasRunning && !startTime) {
+                    startTime = new Date();
+                    startUptimeTimer();
+                }
             } catch (error) {
                 console.error('状态检查失败');
+            }
+        }
+        
+        // 检查配置状态
+        async function checkConfigStatus() {
+            try {
+                const response = await fetch('/api/config/status');
+                const data = await response.json();
+                
+                const configStatus = document.getElementById('configStatus');
+                const configStatusIcon = document.getElementById('configStatusIcon');
+                
+                if (data.complete) {
+                    configStatus.textContent = '已完成';
+                    configStatus.style.color = '#10b981';
+                    configStatusIcon.className = 'stat-icon green';
+                } else {
+                    configStatus.textContent = '未完成';
+                    configStatus.style.color = '#f59e0b';
+                    configStatusIcon.className = 'stat-icon orange';
+                    
+                    // 显示缺失的配置项提示
+                    if (data.missing && data.missing.length > 0) {
+                        const missingText = data.missing.map(item => {
+                            if (item === 'API_KEY') return 'API Key';
+                            if (item === 'COOKIES_STR') return 'Cookies';
+                            return item;
+                        }).join('、');
+                        showToast(`请先配置：${missingText}`, 'warning');
+                    }
+                }
+            } catch (error) {
+                console.error('配置状态检查失败');
             }
         }
         
@@ -993,6 +1035,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             loadConfig();
             checkStatus();
+            checkConfigStatus();
             
             // 如果正在运行，启动计时器
             if (isRunning && startTime) {
