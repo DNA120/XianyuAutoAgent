@@ -32,64 +32,75 @@ class XianyuReplyBot:
         prompt_dir = "prompts"
         config_file = os.path.join(prompt_dir, "prompts_config.txt")
         
-        def parse_config_file(filepath: str) -> dict:
-            """解析统一配置文件"""
-            prompts = {}
-            current_section = None
-            current_content = []
-            
-            with open(filepath, "r", encoding="utf-8") as f:
-                for line in f:
-                    # 查找 section 标记，格式如 [classify_prompt]
-                    if line.strip().startswith('[') and line.strip().endswith(']'):
-                        # 保存上一个 section
-                        if current_section and current_content:
-                            prompts[current_section] = '\n'.join(current_content).strip()
-                        
-                        # 开始新 section
-                        current_section = line.strip()[1:-1]  # 去掉括号
-                        current_content = []
-                    elif current_section:
-                        # 过滤掉装饰线和标题行
-                        if not (line.startswith('╔') or line.startswith('╚') or line.startswith('║') or line.startswith('─')):
-                            current_content.append(line.rstrip())
-            
-            # 保存最后一个 section
-            if current_section and current_content:
-                prompts[current_section] = '\n'.join(current_content).strip()
-            
-            return prompts
+        # 默认提示词配置
+        default_classify = """【角色设定】精准电商意图分类器
+【任务目标】极速甄别买家消息意图，严格仅返回：price/tech/default/no_reply
+
+【分类标准】
+1. price（价格类）：含金额数字或砍价词
+2. tech（技术类）：含参数或技术词
+3. no_reply（无需回复）：系统消息、无关闲聊、退款投诉
+4. default（其他类）：发货、售后、购买流程等日常咨询
+
+仅返回小写类别名：price/tech/default/no_reply"""
+
+        default_price = """【角色说明】资深销售专家
+【议价策略】温和守价，灵活小幅让利，优先引导直接下单
+【回复要求】40字以内，真人自然，随机话术"""
+
+        default_tech = """【角色说明】产品技术专家
+【回复要求】围绕商品内容作答，40字以内，无答案引导下单"""
+
+        default_default = """【角色说明】佛系电商卖家
+【回复要求】只回应交易相关，40字以内，无视无关闲聊，退款关键词不回复"""
         
         try:
-            # 优先使用统一配置文件
+            # 读取配置文件
             if os.path.exists(config_file):
-                prompts = parse_config_file(config_file)
+                with open(config_file, "r", encoding="utf-8") as f:
+                    content = f.read().strip()
                 
-                self.classify_prompt = prompts.get('classify_prompt', '')
-                self.price_prompt = prompts.get('price_prompt', '')
-                self.tech_prompt = prompts.get('tech_prompt', '')
-                self.default_prompt = prompts.get('default_prompt', '')
-                
-                logger.info("从统一配置文件加载所有提示词")
+                # 检查是否为单一格式 "提示词：xxx"
+                if content.startswith("提示词："):
+                    # 单一提示词格式：应用到所有模块
+                    main_prompt = content[4:].strip()
+                    self.classify_prompt = f"【分类任务】识别买家提问类型，返回price/tech/default/no_reply\n【规则】{main_prompt}"
+                    self.price_prompt = f"【议价任务】处理价格协商\n【规则】{main_prompt}"
+                    self.tech_prompt = f"【技术任务】解答商品咨询\n【规则】{main_prompt}"
+                    self.default_prompt = f"【日常任务】处理通用咨询\n【规则】{main_prompt}"
+                    logger.info("从单一格式配置文件加载提示词")
+                else:
+                    # 旧版多模块格式
+                    prompts = {}
+                    current_section = None
+                    current_content = []
+                    
+                    for line in content.split('\n'):
+                        if line.strip().startswith('[') and line.strip().endswith(']'):
+                            if current_section and current_content:
+                                prompts[current_section] = '\n'.join(current_content).strip()
+                            current_section = line.strip()[1:-1]
+                            current_content = []
+                        elif current_section:
+                            if not (line.startswith('╔') or line.startswith('╚') or line.startswith('║') or line.startswith('─')):
+                                current_content.append(line.rstrip())
+                    
+                    if current_section and current_content:
+                        prompts[current_section] = '\n'.join(current_content).strip()
+                    
+                    self.classify_prompt = prompts.get('classify_prompt', default_classify)
+                    self.price_prompt = prompts.get('price_prompt', default_price)
+                    self.tech_prompt = prompts.get('tech_prompt', default_tech)
+                    self.default_prompt = prompts.get('default_prompt', default_default)
+                    logger.info("从多模块配置文件加载提示词")
             else:
-                # 兼容旧版：从单独文件加载
-                def load_prompt_content(name: str) -> str:
-                    target_path = os.path.join(prompt_dir, f"{name}.txt")
-                    if os.path.exists(target_path):
-                        file_path = target_path
-                    else:
-                        file_path = os.path.join(prompt_dir, f"{name}_example.txt")
-                    with open(file_path, "r", encoding="utf-8") as f:
-                        content = f.read()
-                        return content
-                
-                self.classify_prompt = load_prompt_content("classify_prompt")
-                self.price_prompt = load_prompt_content("price_prompt")
-                self.tech_prompt = load_prompt_content("tech_prompt")
-                self.default_prompt = load_prompt_content("default_prompt")
-                
-                logger.info("从单独文件加载所有提示词")
-                
+                # 使用默认配置
+                self.classify_prompt = default_classify
+                self.price_prompt = default_price
+                self.tech_prompt = default_tech
+                self.default_prompt = default_default
+                logger.info("使用默认提示词配置")
+            
             logger.info("成功加载所有提示词")
         except Exception as e:
             logger.error(f"加载提示词时出错: {e}")
