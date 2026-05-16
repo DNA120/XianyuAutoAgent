@@ -1,19 +1,11 @@
-.git
-.github
-.gitignore
+venv/
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
-*_prompt.txt
+*.pyc
+*.pyo
 .env
-.DS_Store
-.vscode/
+.git/
+.gitignore
 *.log
-data/
-images/
-backups/
-Dockerfile
-docker-compose.yml
-.dockerignore
-# README.md 
+.coverage
+htmlcov/
+.DS_Store
