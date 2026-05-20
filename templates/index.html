@@ -795,10 +795,13 @@
                 isRunning = data.is_running;
                 updateStatusUI();
                 
-                // 如果机器人正在运行但之前没有记录startTime，设置当前时间为起始时间
-                if (isRunning && !wasRunning && !startTime) {
-                    startTime = new Date();
+                // 使用后端返回的启动时间
+                if (isRunning && data.start_time) {
+                    startTime = new Date(data.start_time * 1000);
                     startUptimeTimer();
+                } else if (!isRunning) {
+                    startTime = null;
+                    stopUptimeTimer();
                 }
             } catch (error) {
                 console.error('状态检查失败');
@@ -946,8 +949,13 @@
         }
         
         // 清空日志显示
-        function clearLogs() {
-            document.getElementById('logBody').innerHTML = '<div class="log-empty">日志已清空</div>';
+        async function clearLogs() {
+            try {
+                await fetch('/api/logs/clear', { method: 'POST' });
+                document.getElementById('logBody').innerHTML = '<div class="log-empty">日志已清空</div>';
+            } catch (error) {
+                console.error('清空日志失败:', error);
+            }
         }
         
         // 提示词管理

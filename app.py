@@ -12,6 +12,7 @@ is_running = False
 current_logs = []
 bot_process = None
 log_lock = threading.Lock()
+bot_start_time = None  # 记录机器人启动时间
 
 # 默认配置模板
 DEFAULT_CONFIG = {
@@ -134,7 +135,8 @@ def api_config_status():
 def api_status():
     return jsonify({
         "is_running": is_running,
-        "log_count": len(current_logs)
+        "log_count": len(current_logs),
+        "start_time": bot_start_time
     })
 
 @app.route('/api/logs')
@@ -148,9 +150,16 @@ def api_logs_latest():
     with log_lock:
         return jsonify(current_logs[-count:])
 
+@app.route('/api/logs/clear', methods=['POST'])
+def api_logs_clear():
+    global current_logs
+    with log_lock:
+        current_logs = []
+    return jsonify({"success": True, "message": "日志已清空"})
+
 @app.route('/api/start', methods=['POST'])
 def api_start():
-    global is_running, bot_process
+    global is_running, bot_process, bot_start_time
     
     if is_running:
         return jsonify({"error": "机器人已在运行中"}), 400
@@ -173,6 +182,7 @@ def api_start():
         )
         
         is_running = True
+        bot_start_time = time.time()  # 记录启动时间
         
         threading.Thread(target=monitor_logs, daemon=True).start()
         
@@ -205,13 +215,14 @@ def api_start():
 
 @app.route('/api/stop', methods=['POST'])
 def api_stop():
-    global is_running, bot_process
+    global is_running, bot_process, bot_start_time
     
     if not is_running:
         return jsonify({"error": "机器人未运行"}), 400
     
     try:
         is_running = False
+        bot_start_time = None  # 清除启动时间
         if bot_process:
             bot_process.terminate()
             bot_process.wait(timeout=5)
