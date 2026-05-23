@@ -23,7 +23,7 @@ class XianyuLive:
         self.cookies_str = cookies_str
         self.cookies = trans_cookies(cookies_str)
         self.xianyu.session.cookies.update(self.cookies)  # 直接使用 session.cookies.update
-        self.myid = self.cookies['unb']
+        self.myid = self.cookies.get('unb', self.cookies.get('tracknick', ''))
         self.device_id = generate_device_id(self.myid)
         self.context_manager = ChatContextManager()
         
