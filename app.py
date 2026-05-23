@@ -13,6 +13,7 @@ current_logs = []
 bot_process = None
 log_lock = threading.Lock()
 bot_start_time = None  # 记录机器人启动时间
+auto_login_status = {"running": False, "success": None, "message": ""}
 
 # 默认配置模板
 DEFAULT_CONFIG = {
@@ -22,7 +23,9 @@ DEFAULT_CONFIG = {
     'MODEL_NAME': 'deepseek-chat',
     'TOGGLE_KEYWORDS': '。',
     'SIMULATE_HUMAN_TYPING': 'False',
-    'LOG_LEVEL': 'INFO'
+    'LOG_LEVEL': 'INFO',
+    'XIANYU_USERNAME': '',
+    'XIANYU_PASSWORD': ''
 }
 
 def init_default_env():
@@ -63,7 +66,8 @@ def write_env_file(config):
         f.write("# XianyuAutoAgent 配置文件\n")
         f.write("# 请在前端管理界面中配置以下参数\n\n")
         for key, value in config.items():
-            f.write(f"{key}={value}\n")
+            clean_value = value.replace('\n', ' ').replace('\r', ' ').strip()
+            f.write(f"{key}={clean_value}\n")
 
 def check_config_complete(config):
     """检查配置是否完整"""
@@ -111,6 +115,85 @@ def api_config():
         config.update(data)
         write_env_file(config)
         return jsonify({"success": True, "message": "配置已保存"})
+
+
+@app.route('/api/auto-login', methods=['POST'])
+def api_auto_login():
+    """使用浏览器自动登录闲鱼并更新cookie"""
+    global auto_login_status
+
+    if auto_login_status["running"]:
+        return jsonify({"success": False, "message": "已有自动登录任务正在运行，请耐心等待..."})
+
+    config = read_env_file()
+    username = config.get('XIANYU_USERNAME', '')
+    password = config.get('XIANYU_PASSWORD', '')
+
+    if not username or not password:
+        with log_lock:
+            current_logs.append({
+                "time": datetime.now().strftime("%H:%M:%S"),
+                "content": "❌ 自动登录失败：未配置闲鱼账号密码"
+            })
+        return jsonify({"success": False, "message": "请先在配置页面填写闲鱼账号和密码"})
+
+    def add_log(msg):
+        with log_lock:
+            current_logs.append({
+                "time": datetime.now().strftime("%H:%M:%S"),
+                "content": msg
+            })
+
+    auto_login_status = {"running": True, "success": None, "message": "登录中..."}
+
+    def run_auto_login():
+        global auto_login_status
+        try:
+            import asyncio
+            from browser_login import BrowserLogin
+
+            add_log("🚀 开始自动登录流程...")
+
+            login_bot = BrowserLogin(log_callback=add_log)
+
+            async def do_login():
+                add_log("🌐 正在启动浏览器...")
+                result = await login_bot.auto_login(username, password)
+                add_log("🔒 浏览器已关闭")
+                await login_bot.close()
+                return result
+
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            cookie_str = loop.run_until_complete(do_login())
+            loop.close()
+
+            if cookie_str and len(cookie_str) > 50:
+                config = read_env_file()
+                config['COOKIES_STR'] = cookie_str
+                write_env_file(config)
+                add_log("✅ 浏览器自动登录成功，Cookie已更新并保存到.env文件")
+                auto_login_status = {"running": False, "success": True, "message": "自动登录成功，Cookie已更新"}
+            else:
+                add_log("❌ 自动登录失败，未能获取到有效Cookie")
+                auto_login_status = {"running": False, "success": False, "message": "自动登录失败，未能获取到有效Cookie"}
+        except ImportError:
+            add_log("❌ Playwright未安装，无法使用浏览器自动登录")
+            auto_login_status = {"running": False, "success": False, "message": "Playwright未安装"}
+        except Exception as e:
+            add_log(f"❌ 自动登录异常: {str(e)}")
+            auto_login_status = {"running": False, "success": False, "message": f"自动登录失败: {str(e)}"}
+
+    t = threading.Thread(target=run_auto_login, daemon=True)
+    t.start()
+
+    return jsonify({"success": True, "message": "自动登录已启动，请在日志面板查看实时进度..."})
+
+
+@app.route('/api/auto-login-status', methods=['GET'])
+def api_auto_login_status():
+    return jsonify(auto_login_status)
+
 
 @app.route('/api/config/status')
 def api_config_status():

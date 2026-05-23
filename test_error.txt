@@ -1,0 +1,11 @@
+2026-05-23 18:02:42.685 | INFO     | __main__:<module>:753 - 已加载 .env 配置
+2026-05-23 18:02:42.700 | INFO     | __main__:<module>:757 - 已加载 .env.example 默认配置
+2026-05-23 18:02:42.734 | INFO     | __main__:<module>:767 - 日志级别设置为: INFO
+2026-05-23 18:02:42.768 | INFO     | __main__:check_and_complete_env:737 - 配置检查通过
+2026-05-23 18:02:43.562 | INFO     | XianyuAgent:_init_system_prompts:71 - 从单一格式配置文件加载提示词
+2026-05-23 18:02:43.584 | INFO     | XianyuAgent:_init_system_prompts:104 - 成功加载所有提示词
+2026-05-23 18:02:43.622 | INFO     | context_manager:_init_db:93 - 聊天历史数据库初始化完成: data/chat_history.db
+2026-05-23 18:02:43.909 | INFO     | __main__:init:161 - 获取初始token...
+2026-05-23 18:02:43.909 | INFO     | __main__:refresh_token:63 - 开始刷新token...
+2026-05-23 18:02:44.128 | ERROR    | XianyuApis:get_token:251 - \u274c 触发风控: ['FAIL_SYS_USER_VALIDATE', 'RGV587_ERROR::SM::哎哟喂,被挤爆啦,请稍后重试']
+2026-05-23 18:02:44.129 | ERROR    | XianyuApis:get_token:252 - \U0001f534 系统目前无法自动解决，请进入闲鱼网页版-点击消息-过滑块-复制最新的Cookie

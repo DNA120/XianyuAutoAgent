@@ -707,29 +707,42 @@ class XianyuLive:
 
 
 def check_and_complete_env(require_config=True):
-    """检查并补全关键环境变量"""
-    # 定义关键变量
+    """检查并补全关键环境变量，返回配置字典"""
     critical_vars = ["API_KEY", "COOKIES_STR"]
-    
-    # 检查配置是否完整
+
+    file_config = {}
+    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+    if os.path.exists(env_path):
+        with open(env_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)
+                    file_config[key.strip()] = value.strip()
+
     config_complete = True
     for key in critical_vars:
         curr_val = os.getenv(key)
         if not curr_val or curr_val.strip() == "":
+            file_val = file_config.get(key, '')
+            if file_val and file_val.strip():
+                os.environ[key] = file_val
+                logger.info(f"已从.env文件读取 {key} ({len(file_val)}字符)")
+                continue
             config_complete = False
             logger.warning(f"配置项 [{key}] 未设置")
-    
+
     if config_complete:
         logger.info("配置检查通过")
-        return True
+        return file_config
     else:
         if require_config:
             logger.error("配置不完整，请在前端管理界面中配置 API_KEY 和 COOKIES_STR")
             logger.error("启动失败：缺少必要的配置")
-            return False
+            return None
         else:
             logger.warning("配置不完整，但允许启动（仅前端管理界面可用）")
-            return False
+            return file_config
 
 
 if __name__ == '__main__':
@@ -753,10 +766,11 @@ if __name__ == '__main__':
     logger.info(f"日志级别设置为: {log_level}")
     
     # 检查配置是否完整
-    if not check_and_complete_env(require_config=True):
+    config = check_and_complete_env(require_config=True)
+    if config is None:
         exit(1)
-    
-    cookies_str = os.getenv("COOKIES_STR")
+
+    cookies_str = config.get("COOKIES_STR", "")
     bot = XianyuReplyBot()
     xianyuLive = XianyuLive(cookies_str)
     # 常驻进程

@@ -146,6 +146,52 @@ class XianyuApis:
                 return self.get_token(device_id, 0)  # 重置重试次数
             else:
                 logger.error("重新登录失败，Cookie已失效")
+                
+                # 尝试使用Playwright浏览器自动登录
+                logger.info("尝试使用浏览器自动登录...")
+                try:
+                    import asyncio
+                    from browser_login import BrowserLogin
+                    from dotenv import load_dotenv
+                    
+                    load_dotenv()
+                    username = os.getenv('XIANYU_USERNAME', '')
+                    password = os.getenv('XIANYU_PASSWORD', '')
+                    
+                    if username and password:
+                        login_bot = BrowserLogin()
+                        
+                        async def do_login():
+                            cookie_str = await login_bot.auto_login(username, password)
+                            await login_bot.close()
+                            return cookie_str
+                        
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        cookie_str = loop.run_until_complete(do_login())
+                        loop.close()
+                        
+                        if cookie_str and len(cookie_str) > 50:
+                            logger.success("✅ 浏览器自动登录成功，已获取新Cookie")
+                            from http.cookies import SimpleCookie
+                            cookie = SimpleCookie()
+                            cookie.load(cookie_str)
+                            self.session.cookies.clear()
+                            for key, morsel in cookie.items():
+                                self.session.cookies.set(key, morsel.value, domain='.goofish.com')
+                            self.update_env_cookies()
+                            return self.get_token(device_id, 0)
+                        else:
+                            logger.error("浏览器自动登录失败，未能获取到有效Cookie")
+                    else:
+                        logger.warning("未配置闲鱼账号密码，跳过自动登录")
+                        logger.info("💡 可在.env文件中配置XIANYU_USERNAME和XIANYU_PASSWORD启用自动登录")
+                except ImportError:
+                    logger.warning("Playwright未安装，无法使用浏览器自动登录")
+                    logger.info("💡 安装: pip install playwright && python -m playwright install chromium")
+                except Exception as e:
+                    logger.error(f"浏览器自动登录异常: {e}")
+                
                 logger.error("🔴 程序即将退出，请更新.env文件中的COOKIES_STR后重新启动")
                 sys.exit(1)  # 直接退出程序
 
