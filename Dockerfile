@@ -1,17 +1,13 @@
-FROM python:3.10-slim
+FROM mcr.microsoft.com/playwright:latest
 
 WORKDIR /app
 
-# 复制依赖文件并安装
-COPY requirements.txt .
+RUN apt-get update && apt-get install -y python3 python3-pip && \
+    pip3 install playwright flask loguru websockets requests python-dotenv openai && \
+    rm -rf /var/lib/apt/lists/*
 
-# 安装依赖（先安装flask确保存在）
-RUN pip install --no-cache-dir flask==3.1.0 && \
-    pip install --no-cache-dir openai==1.65.5 websockets==13.1 loguru==0.7.3 python-dotenv==1.0.1 requests==2.32.3
-
-# 复制应用代码
 COPY . .
 
 EXPOSE 5000
 
-CMD ["python", "app.py"]
+CMD ["python3", "app.py"]

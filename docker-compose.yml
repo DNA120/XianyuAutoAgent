@@ -1,16 +1,11 @@
-version: '3.8'
+version: "3.8"
+
 services:
-  xianyu-autoagent:
+  xianyu-bot:
     build: .
-    container_name: xianyu-autoagent
-    environment:
-      - API_KEY=${API_KEY}
-      - COOKIES_STR=${COOKIES_STR}
-      - MODEL_BASE_URL=${MODEL_BASE_URL:-https://api.deepseek.com/v1}
-      - MODEL_NAME=${MODEL_NAME:-deepseek-chat}
-      - PORT=${PORT:-5000}
+    container_name: xianyu-auto-agent
+    ports:
+      - "5000:5000"
     volumes:
-      - ./prompts:/app/prompts
-      - ./data:/app/data
+      - ./.env:/app/.env
     restart: unless-stopped
-    network_mode: host

@@ -1,11 +1,7 @@
-venv/
-__pycache__/
+.git
+venv
+__pycache__
 *.pyc
-*.pyo
-.env
-.git/
-.gitignore
-*.log
-.coverage
-htmlcov/
-.DS_Store
+.env.example
+test_*
+logs
