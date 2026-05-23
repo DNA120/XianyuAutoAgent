@@ -1,7 +1,11 @@
 .git
+.gitignore
 venv
+venv_*
 __pycache__
 *.pyc
 .env.example
 test_*
 logs
+*.md
+.gitattributes
